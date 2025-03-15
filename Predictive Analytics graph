@@ -1,0 +1,100 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import datetime
+from statsmodels.tsa.arima.model import ARIMA
+from scipy.signal import savgol_filter
+import seaborn as sns
+
+# ✅ Step 1: Generate Complex Waste Filling Data
+np.random.seed(42)
+time_intervals = 150  # Past data points (e.g., last 150 hours)
+initial_fill = 10  # Initial bin fill level (in %)
+
+# Simulate sharp ups and downs in fill rate
+fill_rate = np.cumsum(np.random.randint(-3, 10, size=time_intervals))  # Random changes
+fill_rate = np.clip(fill_rate, 0, 100)  # Keep values within 0-100%
+
+# Introduce historical errors (sensor faults, misreadings)
+error_indices = np.random.choice(time_intervals, size=10, replace=False)
+fill_rate[error_indices] += np.random.randint(-20, 20, size=10)
+fill_rate = np.clip(fill_rate, 0, 100)
+
+# Create timestamps
+timestamps = [datetime.datetime.now() - datetime.timedelta(hours=i) for i in range(time_intervals)]
+timestamps.reverse()
+df = pd.DataFrame({'Timestamp': timestamps, 'Fill_Level': fill_rate})
+df.set_index('Timestamp', inplace=True)
+
+# ✅ Step 2: Train ARIMA Model for Prediction
+model = ARIMA(df['Fill_Level'], order=(2, 1, 2))
+model_fit = model.fit()
+
+# ✅ Step 3: Predict Future Waste Levels
+future_steps = 30  # Predict next 30 hours
+# The forecast method might return only the prediction
+# or a tuple of (prediction, stderr) if conf_int is not available.
+forecast_result = model_fit.forecast(steps=future_steps, alpha=0.05, return_conf_int=True)
+
+# Handle cases where confidence intervals are not returned or have incorrect shape
+if isinstance(forecast_result, tuple) and len(forecast_result) == 3:
+    future_forecast, stderr, conf_int = forecast_result
+    # Check if conf_int has the expected shape (future_steps, 2)
+    if conf_int.shape != (future_steps, 2):
+        conf_int = None  # Handle cases where conf_int is not (future_steps, 2)
+elif isinstance(forecast_result, tuple) and len(forecast_result) == 2:
+    future_forecast, stderr = forecast_result
+    conf_int = None  # or provide a default confidence interval
+else:
+    future_forecast = forecast_result
+    stderr = None
+    conf_int = None
+
+# Create timestamps for predictions
+future_timestamps = [df.index[-1] + datetime.timedelta(hours=i) for i in range(1, future_steps + 1)]
+future_df = pd.DataFrame({'Timestamp': future_timestamps, 'Fill_Level': future_forecast})
+future_df.set_index('Timestamp', inplace=True)
+
+# ✅ Step 4: Estimate Time Until Full (100% Waste Level)
+full_threshold = 100
+predicted_full_time = None
+for i, level in enumerate(future_forecast):
+    if level >= full_threshold:
+        predicted_full_time = future_timestamps[i]
+        break
+
+# ✅ Step 5: Smooth Data for Trend Visualization
+smoothed_fill_rate = savgol_filter(df['Fill_Level'], 21, 3)  # Apply Savitzky-Golay smoothing
+
+# ✅ Step 6: Plot Graph (Complex Visualization)
+sns.set_style("darkgrid")
+plt.figure(figsize=(14, 7))
+plt.plot(df.index, df['Fill_Level'], label="Raw Past Waste Levels", marker='o', linestyle='-', color='blue', alpha=0.6)
+plt.plot(df.index, smoothed_fill_rate, label="Smoothed Trend", linestyle='solid', color='navy', linewidth=2)
+plt.plot(future_df.index, future_df['Fill_Level'], label="Predicted Waste Levels", linestyle="dashed", marker='s', color='red')
+
+# Confidence Interval for Prediction (only if available and has the correct shape)
+if conf_int is not None and conf_int.shape == (future_steps, 2):
+    plt.fill_between(future_df.index, conf_int[:, 0], conf_int[:, 1], color='red', alpha=0.2, label='Prediction Confidence Interval')
+
+# Mark Estimated Bin Full Time
+if predicted_full_time:
+    plt.axvline(predicted_full_time, color='green', linestyle='--', label=f'Estimated Full Time: {predicted_full_time.strftime("%Y-%m-%d %H:%M")}')
+    plt.scatter(predicted_full_time, full_threshold, color='green', s=120, zorder=3, label='Full Bin Point')
+
+# Highlight Sensor Errors
+plt.scatter(df.index[error_indices], df['Fill_Level'].iloc[error_indices], color='orange', marker='x', s=100, label='Sensor Errors')
+
+plt.xlabel("Time")
+plt.ylabel("Bin Fill Level (%)")
+plt.title("Advanced Predictive Analytics for Waste Bin Filling Rate")
+plt.legend()
+plt.xticks(rotation=45)
+plt.grid(True)
+plt.show()
+
+# ✅ Step 7: Display Estimated Full Time
+if predicted_full_time:
+    print(f"⏳ Estimated Time Until Bin is Full: {predicted_full_time}")
+else:
+    print("✅ The bin will not reach 100% in the predicted time range.")
