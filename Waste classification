@@ -1,0 +1,56 @@
+# Import necessary libraries
+import tensorflow as tf
+from tensorflow.keras.preprocessing import image
+import numpy as np
+import matplotlib.pyplot as plt
+from google.colab import files
+import cv2
+
+# Waste category labels
+CLASS_LABELS = {
+    0: "Green Bin 🟢 (Wet & Organic Waste)",
+    1: "Blue Bin 🔵 (Dry & Recyclable Waste)",
+    2: "Red Bin 🔴 (Hazardous & E-waste)",
+    3: "Black Bin ⚫ (Sanitary & Non-Recyclable Waste)"
+}
+
+# Upload an image
+uploaded = files.upload()
+
+# Get the uploaded image filename
+filename = list(uploaded.keys())[0]
+
+# Load and preprocess the image
+def preprocess_image(image_path):
+    img = image.load_img(image_path, target_size=(224, 224))  # Resize image
+    img_array = image.img_to_array(img)
+    img_array = np.expand_dims(img_array, axis=0)  # Expand dimensions for model input
+    img_array /= 255.0  # Normalize pixel values
+    return img_array
+
+# Load MobileNetV2 pre-trained model (without weights)
+base_model = tf.keras.applications.MobileNetV2(weights=None, input_shape=(224, 224, 3), classes=4)
+
+# Predict waste category (random output since no training is done)
+def predict_waste_category(image_path):
+    processed_img = preprocess_image(image_path)
+    prediction = np.random.rand(1, 4)  # Generate random predictions (since no model is trained)
+    class_idx = np.argmax(prediction)  # Get the highest probability class
+    return CLASS_LABELS[class_idx]
+
+# Display the uploaded image
+def display_image(image_path):
+    img = cv2.imread(image_path)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    plt.imshow(img)
+    plt.axis("off")
+    plt.show()
+
+# Predict the waste category
+predicted_category = predict_waste_category(filename)
+
+# Display the image separately
+display_image(filename)
+
+# Print the classification result in text format
+print(f"---WASTE CLASSIFICATION RESULT---: {predicted_category}")
