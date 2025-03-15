@@ -1,0 +1,37 @@
+% Smart Waste Bin Prediction using MATLAB
+clc; clear; close all;
+
+% Simulating Time (Days)
+days_past = 1:100; % Past 100 days
+days_future = 101:120; % Next 20 days prediction
+
+% Simulated Waste Level Data (Randomized with Ups and Downs)
+waste_levels = 30 + 40*sin(0.2*days_past) + 15*randn(size(days_past));
+
+% Fit a Polynomial Regression Model (Degree 3 for Complexity)
+p = polyfit(days_past, waste_levels, 3);
+
+% Predict Future Waste Levels
+waste_predicted = polyval(p, days_future);
+
+% Plot Past Data
+figure;
+plot(days_past, waste_levels, 'bo-', 'LineWidth', 1.5, 'MarkerSize', 6);
+hold on;
+
+% Plot Future Predictions
+plot(days_future, waste_predicted, 'r*-', 'LineWidth', 1.8, 'MarkerSize', 7);
+
+% Formatting the Graph
+grid on;
+xlabel('Days');
+ylabel('Waste Bin Filling Level (%)');
+title('Waste Bin Filling Prediction using AI');
+legend('Actual Waste Data', 'Predicted Waste Trend');
+set(gca, 'FontSize', 12);
+
+% Show Alert if Waste Reaches 90% Full
+max_future_fill = max(waste_predicted);
+if max_future_fill >= 90
+    disp('🚨 Warning: The bin will be *FULL SOON*! Optimize collection.');
+end
